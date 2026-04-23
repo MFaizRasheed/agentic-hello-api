@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from sqlmodel import delete, select
 
 from .agent_setup import run_agent
 from .db import Conversation, Message, SessionDep, init_db
@@ -46,6 +47,12 @@ def create_conversation(session: SessionDep):
     return convo
 
 
+@app.get("/conversations", response_model=list[ConversationOut], tags=["conversations"])
+def list_conversations(session: SessionDep):
+    """List all conversations, newest first."""
+    return session.exec(select(Conversation).order_by(Conversation.created_at.desc())).all()
+
+
 @app.post("/conversations/{cid}/chat", response_model=ChatOut, tags=["conversations"])
 async def chat(cid: int, body: ChatIn, session: SessionDep):
     """Send a message, get the agent's reply, and persist both."""
@@ -69,3 +76,16 @@ async def chat(cid: int, body: ChatIn, session: SessionDep):
 
     session.commit()
     return ChatOut(reply=reply, conversation_id=cid)
+
+
+@app.delete("/conversations/{cid}", status_code=status.HTTP_204_NO_CONTENT, tags=["conversations"])
+def delete_conversation(cid: int, session: SessionDep):
+    """Delete a conversation and all of its messages."""
+    convo = session.get(Conversation, cid)
+    if not convo:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
+
+    session.exec(delete(Message).where(Message.conversation_id == cid))
+    session.delete(convo)
+    session.commit()
+

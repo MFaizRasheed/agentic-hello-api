@@ -27,18 +27,10 @@ class Message(SQLModel, table=True):
     conversation: Conversation | None = Relationship(back_populates="messages")
 
 
-# connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-
-engine = create_engine(
-    settings.database_url,
-    # connect_args=connect_args,
-    # pool_pre_ping=True,
-)
-
+engine = create_engine(settings.database_url)
 
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
-
 
 def get_session():
     with Session(engine) as session:

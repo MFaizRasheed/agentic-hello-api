@@ -1,44 +1,27 @@
+import sys
 import os
-from dotenv import load_dotenv
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+from app.config import get_settings
+
+from functools import lru_cache
 
 from openai import AsyncOpenAI
 from agents import OpenAIChatCompletionsModel, set_tracing_disabled
 
 
-load_dotenv()
+settings = get_settings()
 set_tracing_disabled(True)
 
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-OLLAMA_DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
-
-
-client = None
-
+@lru_cache
 def get_client() -> AsyncOpenAI:
-    global client
-    if client is None:
-        client = AsyncOpenAI(
-            base_url=OLLAMA_BASE_URL, 
-            api_key="ollama"
-        )
+    client = AsyncOpenAI(base_url=settings.ollama_base_url, api_key="ollama")
     return client
 
 
 def get_model(model_name: str | None = None) -> OpenAIChatCompletionsModel:
-    """Get an Ollama-backed model for the OpenAI Agents SDK.
-
-    Args:
-        model_name: Ollama model name (must be pulled first).
-                    Defaults to OLLAMA_MODEL env var or 'qwen2.5:7b'.
-
-    Returns:
-        Model ready to use with Agent(model=...).
-
-    Requires:
-        ollama pull <model_name>
-        Models with tool-calling support: qwen2.5, llama3.1, mistral, qwen3
-    """
-    return OpenAIChatCompletionsModel(
-        model=model_name or OLLAMA_DEFAULT_MODEL,
+    """Get an Ollama-backed model for the OpenAI Agents SDK."""
+    local_model = OpenAIChatCompletionsModel(
+        model=model_name or settings.ollama_model,
         openai_client=get_client(),
     )
+    return local_model
